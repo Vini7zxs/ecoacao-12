@@ -1,0 +1,282 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entrar / Cadastrar — EcoAção-12</title>
+  <meta name="description" content="Acesse sua conta ou crie um cadastro no EcoAção-12 para verificar sua área de risco e assinar a petição." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .login-page {
+      min-height: calc(100vh - 70px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--verde-escuro) 0%, #2e6b40 100%);
+      padding: 3rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .login-page::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 10% 90%, rgba(74,156,95,0.2) 0%, transparent 40%),
+        radial-gradient(circle at 90% 10%, rgba(212,237,218,0.1) 0%, transparent 40%);
+      pointer-events: none;
+    }
+    .login-wrapper { display: flex; gap: 4rem; align-items: flex-start; z-index: 1; max-width: 980px; width: 100%; }
+    .login-info { flex: 1; color: var(--branco); padding-top: 1rem; }
+    .login-info h2 { color: var(--branco); margin-bottom: 1rem; font-size: clamp(1.5rem, 3vw, 2rem); }
+    .login-info p { color: rgba(255,255,255,0.8); font-size: 0.95rem; }
+    .login-benefits { list-style: none; margin-top: 1.5rem; }
+    .login-benefits li { display: flex; align-items: flex-start; gap: 0.6rem; color: rgba(255,255,255,0.85); font-size: 0.9rem; margin-bottom: 0.8rem; }
+    .login-benefits li::before { content: "✓"; color: var(--verde-suave); font-weight: 700; flex-shrink: 0; }
+    .login-form-side { flex: 1; min-width: 320px; }
+    .tab-nav { background: rgba(255,255,255,0.1); }
+    .tab-btn { color: rgba(255,255,255,0.7); }
+    .tab-btn.active { background: var(--branco); color: var(--verde-escuro); }
+    .tab-content { display: none; }
+    .tab-content.show { display: block; }
+    .terms-accept { background: var(--verde-suave); border-radius: var(--radius-sm); padding: 1rem 1.2rem; margin: 1rem 0; font-size: 0.85rem; color: var(--verde-escuro); }
+    .strength-bar { height: 4px; border-radius: 2px; background: var(--bege-escuro); margin-top: 0.4rem; overflow: hidden; }
+    .strength-fill { height: 100%; border-radius: 2px; transition: width 0.3s, background 0.3s; }
+    @media(max-width: 700px) { .login-wrapper { flex-direction: column; gap: 2rem; } .login-info { display: none; } }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="../index.html" class="navbar-brand">
+        <div class="logo-icon">🌿</div>
+        <span class="brand-text">Eco<span>Ação</span>-12</span>
+      </a>
+      <ul class="navbar-links">
+        <li><a href="../index.html">Início</a></li>
+        <li><a href="quem-somos.html">Quem Somos</a></li>
+        <li><a href="areas-de-risco.html">Áreas de Risco</a></li>
+        <li><a href="termos.html">Termos</a></li>
+      </ul>
+      <div class="navbar-actions">
+        <a href="login.html" class="btn-nav-login">Entrar</a>
+        <button class="navbar-toggle" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="login-page">
+    <div class="login-wrapper">
+
+      <!-- Coluna Info -->
+      <div class="login-info">
+        <span style="font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--verde-suave); font-weight: 600;">EcoAção-12 · Plataforma Cidadã</span>
+        <h2 style="margin-top: 0.7rem;">Acesse e faça parte da mudança em Caxias do Sul</h2>
+        <p>Ao se cadastrar, você:</p>
+        <ul class="login-benefits">
+          <li>Verifica se seu endereço está em área de risco por resíduos industriais</li>
+          <li>Recebe recomendações de saúde personalizadas para sua localização</li>
+          <li>Assina automaticamente a petição pela revisão do PMGIRS</li>
+          <li>Contribui para um banco de dados que pressiona o poder público a agir</li>
+          <li>Acessa informações atualizadas sobre as áreas monitoradas</li>
+        </ul>
+        <div style="margin-top: 2rem; padding: 1.2rem; background: rgba(255,255,255,0.08); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.15);">
+          <p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0;">
+            🔒 Seus dados são protegidos conforme a <strong style="color:var(--verde-suave);">LGPD</strong> e utilizados exclusivamente para os fins descritos nos <a href="termos.html" style="color:var(--verde-suave);">Termos de Uso</a>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Coluna Formulário -->
+      <div class="login-form-side">
+        <div class="form-box">
+
+          <!-- Tabs -->
+          <div class="tab-nav" style="margin-bottom: 1.8rem;">
+            <button class="tab-btn active" onclick="switchTab('login', this)">Entrar</button>
+            <button class="tab-btn" onclick="switchTab('register', this)">Criar conta</button>
+          </div>
+
+          <!-- TAB: LOGIN -->
+          <div id="tab-login" class="tab-content show">
+            <h2 style="font-size: 1.5rem; margin-bottom: 0.3rem;">Bem-vindo de volta</h2>
+            <p class="form-subtitle">Entre com suas credenciais para continuar.</p>
+
+            <form onsubmit="handleLogin(event)">
+              <div class="form-group">
+                <label for="login-email">E-mail</label>
+                <input type="email" id="login-email" class="form-control" placeholder="seu@email.com" required />
+              </div>
+              <div class="form-group">
+                <label for="login-pass">Senha</label>
+                <input type="password" id="login-pass" class="form-control" placeholder="••••••••" required />
+              </div>
+              <div style="text-align: right; margin-top: -0.5rem; margin-bottom: 1.2rem;">
+                <a href="#" style="font-size: 0.85rem;">Esqueci minha senha</a>
+              </div>
+              <button type="submit" class="btn btn-verde btn-full">Entrar na plataforma</button>
+            </form>
+
+            <div class="form-divider">ou</div>
+            <p style="text-align:center; font-size: 0.88rem; color: var(--texto-claro);">
+              Ainda não tem conta? <a href="#" onclick="switchTabByName('register')">Crie gratuitamente</a>
+            </p>
+          </div>
+
+          <!-- TAB: CADASTRO -->
+          <div id="tab-register" class="tab-content">
+            <h2 style="font-size: 1.5rem; margin-bottom: 0.3rem;">Criar minha conta</h2>
+            <p class="form-subtitle">Gratuito. Sem spam. Sua voz importa.</p>
+
+            <!-- Steps -->
+            <div class="steps" style="margin-bottom: 2rem;">
+              <div class="step done" id="step1"><div class="step-circle">✓</div><span class="step-label">Dados</span></div>
+              <div class="step active" id="step2"><div class="step-circle">2</div><span class="step-label">Termos</span></div>
+              <div class="step" id="step3"><div class="step-circle">3</div><span class="step-label">Conclusão</span></div>
+            </div>
+
+            <form onsubmit="handleRegister(event)">
+              <div class="form-group">
+                <label for="reg-name">Nome completo</label>
+                <input type="text" id="reg-name" class="form-control" placeholder="Seu nome completo" required />
+              </div>
+              <div class="form-group">
+                <label for="reg-email">E-mail</label>
+                <input type="email" id="reg-email" class="form-control" placeholder="seu@email.com" required />
+              </div>
+              <div class="form-group">
+                <label for="reg-pass">Senha</label>
+                <input type="password" id="reg-pass" class="form-control" placeholder="Mínimo 8 caracteres" required oninput="updateStrength(this.value)" />
+                <div class="strength-bar"><div class="strength-fill" id="strength-fill" style="width:0;background:#e53e3e;"></div></div>
+              </div>
+
+              <div class="terms-accept">
+                <strong>📜 Ao se cadastrar, você concorda com:</strong>
+                <ul style="margin: 0.6rem 0 0 1.2rem; font-size: 0.83rem;">
+                  <li>Os <a href="termos.html" target="_blank">Termos de Uso</a> da plataforma</li>
+                  <li>A coleta de dados conforme a LGPD</li>
+                  <li>A assinatura da petição pela revisão do PMGIRS</li>
+                </ul>
+              </div>
+
+              <div class="checkbox-group">
+                <input type="checkbox" id="agree-terms" required />
+                <label for="agree-terms">Li e concordo com os <a href="termos.html" target="_blank">Termos de Uso</a> e a <strong>carta à Prefeitura de Caxias do Sul</strong>.</label>
+              </div>
+              <div class="checkbox-group">
+                <input type="checkbox" id="agree-lgpd" required />
+                <label for="agree-lgpd">Autorizo o uso dos meus dados conforme descrito na política de privacidade (LGPD).</label>
+              </div>
+
+              <button type="submit" class="btn btn-verde btn-full" style="margin-top: 1rem;">✍️ Cadastrar e assinar petição</button>
+            </form>
+
+            <p style="text-align:center; font-size: 0.85rem; color: var(--texto-claro); margin-top: 1rem;">
+              Já tem conta? <a href="#" onclick="switchTabByName('login')">Entrar</a>
+            </p>
+          </div>
+
+          <!-- SUCCESS STATE (hidden initially) -->
+          <div id="success-state" style="display:none; text-align:center; padding: 1rem 0;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">🌿</div>
+            <h3>Bem-vindo ao EcoAção-12!</h3>
+            <p style="color: var(--texto-claro); font-size: 0.9rem; margin-bottom: 1.5rem;">
+              Sua conta foi criada e você já faz parte da petição cidadã pela revisão do PMGIRS de Caxias do Sul.
+            </p>
+            <a href="areas-de-risco.html" class="btn btn-verde btn-full">🗺️ Verificar minha área agora</a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="brand-name">🌿 EcoAção-12</div>
+        <p>Plataforma cidadã de monitoramento de áreas de risco por resíduos industriais em Caxias do Sul, RS. Desenvolvida como projeto educacional pelo CETEC — Agosto/2026.</p>
+      </div>
+      <div class="footer-links">
+        <h5>Navegação</h5>
+        <ul>
+          <li><a href="../index.html">Início</a></li>
+          <li><a href="quem-somos.html">Quem Somos</a></li>
+          <li><a href="areas-de-risco.html">Áreas de Risco</a></li>
+          <li><a href="termos.html">Termos de Uso</a></li>
+        </ul>
+      </div>
+      <div class="footer-links">
+        <h5>Referências</h5>
+        <ul>
+          <li><a href="#">PMGIRS — Caxias do Sul</a></li>
+          <li><a href="#">LGPD — Lei nº 13.709/2018</a></li>
+          <li><a href="#">CETEC</a></li>
+        </ul>
+      </div>
+      <div class="footer-contact">
+        <h5>Projeto</h5>
+        <p>📍 Caxias do Sul, RS — Brasil</p>
+        <p>🎓 CETEC · Agosto de 2026</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 EcoAção-12 · Todos os direitos reservados · Projeto acadêmico CETEC — Caxias do Sul, RS</p>
+      <div class="footer-badges">
+        <span class="footer-badge">🌱 Sustentabilidade</span>
+        <span class="footer-badge">⚖️ ODS 11 &amp; 3</span>
+        <span class="footer-badge">🏫 CETEC 2026</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../js/main.js"></script>
+  <script>
+    function switchTab(name, btn) {
+      document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("show"));
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tab-" + name).classList.add("show");
+      btn.classList.add("active");
+    }
+
+    function switchTabByName(name) {
+      document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("show"));
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tab-" + name).classList.add("show");
+      document.querySelectorAll(".tab-btn")[name === "login" ? 0 : 1].classList.add("active");
+      return false;
+    }
+
+    function updateStrength(pwd) {
+      const fill = document.getElementById("strength-fill");
+      let score = 0;
+      if (pwd.length >= 8) score++;
+      if (/[A-Z]/.test(pwd)) score++;
+      if (/[0-9]/.test(pwd)) score++;
+      if (/[^A-Za-z0-9]/.test(pwd)) score++;
+      const colors = ["#e53e3e", "#dd6b20", "#d69e2e", "#2e7d45"];
+      fill.style.width = (score * 25) + "%";
+      fill.style.background = colors[score - 1] || "#e53e3e";
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      alert("MVP: Funcionalidade de login a ser integrada com backend. Dados recebidos com sucesso!");
+    }
+
+    function handleRegister(e) {
+      e.preventDefault();
+      document.getElementById("tab-register").style.display = "none";
+      document.getElementById("success-state").style.display = "block";
+      document.querySelectorAll(".tab-nav, h2, .form-subtitle").forEach(el => el.style.display = "none");
+    }
+  </script>
+</body>
+</html>
