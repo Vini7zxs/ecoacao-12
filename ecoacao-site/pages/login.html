@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -37,9 +37,10 @@
     .login-benefits li { display: flex; align-items: flex-start; gap: 0.6rem; color: rgba(255,255,255,0.85); font-size: 0.9rem; margin-bottom: 0.8rem; }
     .login-benefits li::before { content: "✓"; color: var(--verde-suave); font-weight: 700; flex-shrink: 0; }
     .login-form-side { flex: 1; min-width: 320px; }
-    .tab-nav { background: rgba(255,255,255,0.1); }
-    .tab-btn { color: rgba(255,255,255,0.7); }
-    .tab-btn.active { background: var(--branco); color: var(--verde-escuro); }
+    .tab-nav { background: var(--bege-escuro); border-radius: 8px; display: flex; overflow: hidden; }
+    .tab-btn { flex: 1; padding: 0.7rem 1rem; border: none; background: transparent; font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--verde-escuro); transition: all 0.25s; }
+    .tab-btn:hover { background: rgba(46,125,69,0.08); }
+    .tab-btn.active { background: var(--verde-escuro); color: var(--branco); border-radius: 8px; }
     .tab-content { display: none; }
     .tab-content.show { display: block; }
     .terms-accept { background: var(--verde-suave); border-radius: var(--radius-sm); padding: 1rem 1.2rem; margin: 1rem 0; font-size: 0.85rem; color: var(--verde-escuro); }
