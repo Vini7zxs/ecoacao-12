@@ -293,75 +293,82 @@
     }
 
     // ─── Exibe lista de sugestões clicáveis ──────────────────
+    // ─── Exibe lista de sugestões clicáveis abaixo do resultado ──
     function showSuggestions(items, originalInput) {
       var rc = document.getElementById("resultContent");
-      var html = '<div style="background:#fff;border:1px solid #e8e0d0;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(30,77,43,.1);">';
-      html += '<p style="padding:0.9rem 1.1rem 0.3rem;font-size:0.82rem;color:#6b6b6b;font-weight:600;margin:0;">Resultados para "' + originalInput + '":</p>';
-      html += '<ul style="list-style:none;margin:0;padding:0 0 0.4rem;">';
+      var container = document.createElement("div");
+      container.style.cssText = "margin-top:1.2rem;background:#fff;border:1px solid #e8e0d0;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(30,77,43,.08);";
+
+      var title = document.createElement("p");
+      title.style.cssText = "padding:0.8rem 1.1rem 0.4rem;font-size:0.82rem;color:#6b6b6b;font-weight:600;margin:0;";
+      title.textContent = "Outros resultados para \"" + originalInput + "\":";
+      container.appendChild(title);
+
+      var ul = document.createElement("ul");
+      ul.style.cssText = "list-style:none;margin:0;padding:0 0 0.4rem;";
+
       items.forEach(function(item) {
-        html += '<li onclick="chooseItem(' + item.lat + ',' + item.lon + ',' + JSON.stringify(item.label) + ')" ' +
-                'style="padding:0.65rem 1.1rem;cursor:pointer;border-top:1px solid #f5f0e8;font-size:0.88rem;color:#1e4d2b;transition:background .2s;" ' +
-                'onmouseover="this.style.background=\'#f5f0e8\'" onmouseout="this.style.background=\'\'">' +
-                '📍 ' + item.label + '</li>';
+        var li = document.createElement("li");
+        li.style.cssText = "padding:0.65rem 1.1rem;cursor:pointer;border-top:1px solid #f5f0e8;font-size:0.88rem;color:#1e4d2b;transition:background .2s;";
+        li.textContent = "📍 " + item.label;
+        li.onmouseover = function() { li.style.background = "#f5f0e8"; };
+        li.onmouseout = function() { li.style.background = ""; };
+        li.onclick = function() {
+          showResult(parseFloat(item.lat), parseFloat(item.lon), item.label);
+        };
+        ul.appendChild(li);
       });
-      html += '</ul></div>';
-      rc.innerHTML = html;
+
+      container.appendChild(ul);
+      rc.appendChild(container);
     }
 
-    function chooseItem(lat, lon, label) {
-      showResult(parseFloat(lat), parseFloat(lon), label);
+    // ─── Formata objeto do Photon em label legível ───────────
+    function formatPhotonItem(f) {
+      var p   = f.properties || {};
+      var lon = f.geometry.coordinates[0];
+      var lat = f.geometry.coordinates[1];
+      var parts = [];
+      if (p.name)        parts.push(p.name);
+      if (p.street)      parts.push(p.street + (p.housenumber ? ", " + p.housenumber : ""));
+      if (p.district)    parts.push(p.district);
+      if (p.suburb)      parts.push(p.suburb);
+      if (p.city)        parts.push(p.city);
+      else if (p.town)   parts.push(p.town);
+      else if (p.village) parts.push(p.village);
+      if (p.state)       parts.push(p.state);
+      if (p.country)     parts.push(p.country);
+
+      var label = parts.filter(function(v, i, a) { return Boolean(v) && a.indexOf(v) === i; }).join(", ");
+      return { lat: lat, lon: lon, label: label || (lat + ", " + lon) };
     }
 
-    // ─── Geocoder 1: Photon (Komoot) — CORS livre no file:// ──
-    // Retorna GeoJSON; aceita qq texto (rua, bairro, CEP, cidade…)
-    function searchPhoton(q) {
-      var url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) + "&limit=6&lang=pt";
-      return fetch(url).then(function(r) {
-        if (!r.ok) throw new Error("photon-http-" + r.status);
-        return r.json();
-      }).then(function(geo) {
-        if (!geo.features || geo.features.length === 0) return [];
-        return geo.features.map(function(f) {
-          var p   = f.properties;
-          var lon = f.geometry.coordinates[0];
-          var lat = f.geometry.coordinates[1];
-          // Monta label legível
-          var parts = [];
-          if (p.name)        parts.push(p.name);
-          if (p.street)      parts.push(p.street);
-          if (p.housenumber) parts.push(p.housenumber);
-          if (p.suburb)      parts.push(p.suburb);
-          if (p.city)        parts.push(p.city);
-          else if (p.town)   parts.push(p.town);
-          else if (p.village) parts.push(p.village);
-          if (p.state)       parts.push(p.state);
-          if (p.country)     parts.push(p.country);
-          // Remove duplicatas consecutivas
-          var label = parts.filter(function(v, i, a) { return i === 0 || v !== a[i-1]; }).join(", ");
-          return { lat: lat, lon: lon, label: label || (lat + ", " + lon) };
-        });
-      });
+    // ─── Busca Photon (Komoot) com viés de localização local ──
+    async function searchPhoton(query) {
+      // Prioriza a região de Caxias do Sul/RS, mas funciona com qualquer lugar
+      var url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=6&lat=-29.1678&lon=-51.1794";
+      var res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var geo = await res.json();
+      if (!geo.features || geo.features.length === 0) return [];
+      return geo.features.map(formatPhotonItem);
     }
 
-    // ─── Geocoder 2: Nominatim — fallback ────────────────────
-    function searchNominatim(q) {
-      var url = "https://nominatim.openstreetmap.org/search?format=json&limit=6&q=" + encodeURIComponent(q);
-      return fetch(url, { headers: { "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.5" } })
-        .then(function(r) {
-          if (!r.ok) throw new Error("nominatim-http-" + r.status);
-          return r.json();
-        }).then(function(data) {
-          if (!data || data.length === 0) return [];
-          return data.map(function(d) {
-            return { lat: parseFloat(d.lat), lon: parseFloat(d.lon), label: d.display_name };
-          });
-        });
+    // ─── Suporte a CEP brasileiro via ViaCEP ──────────────────
+    async function searchViaCEP(cepClean) {
+      var url = "https://viacep.com.br/ws/" + encodeURIComponent(cepClean) + "/json/";
+      var res = await fetch(url);
+      if (!res.ok) return null;
+      var data = await res.json();
+      if (data.erro) return null;
+      var query = [data.logradouro, data.bairro, data.localidade, data.uf, "Brasil"].filter(Boolean).join(", ");
+      return query;
     }
 
-    // ─── Busca principal: Photon → fallback Nominatim ─────────
-    function searchAddress() {
-      var addr = document.getElementById("addressInput").value.trim();
-      if (!addr) { alert("Digite um endereço, bairro, CEP ou cidade."); return; }
+    // ─── Busca principal com fallback e timeout seguro ─────────
+    async function searchAddress() {
+      var raw = document.getElementById("addressInput").value.trim();
+      if (!raw) { alert("Digite um endereço, rua, bairro, CEP ou cidade."); return; }
 
       var resultBox = document.getElementById("resultBox");
       var rc        = document.getElementById("resultContent");
@@ -369,31 +376,56 @@
       rc.innerHTML =
         '<div style="text-align:center;padding:1.5rem;">' +
         '<div class="spinner" style="margin:0 auto 0.9rem;width:28px;height:28px;border-width:4px;"></div>' +
-        '<span style="color:#6b6b6b;font-size:0.9rem;">Buscando <em>"' + addr + '"</em>…</span></div>';
+        '<span style="color:#6b6b6b;font-size:0.9rem;">Buscando <em>"' + raw + '"</em>…</span></div>';
 
-      searchPhoton(addr)
-        .catch(function() { return []; })          // Photon falhou → tenta Nominatim
-        .then(function(items) {
-          if (items.length === 0) return searchNominatim(addr).catch(function() { return []; });
-          return items;
-        })
-        .then(function(items) {
-          if (!items || items.length === 0) {
-            rc.innerHTML =
-              '<div class="alert alert-warning" style="margin:0;">' +
-              '🔍 <strong>Nenhum resultado para "' + addr + '".</strong><br>' +
-              '<span style="font-size:0.86rem;">Experimente: nome do bairro, rua, CEP, ponto de referência ou cidade.</span></div>';
-            return;
-          }
-          // 1 resultado → vai direto
-          if (items.length === 1) {
-            showResult(items[0].lat, items[0].lon, items[0].label);
-          } else {
-            // Vários resultados → mostra o melhor automaticamente E lista os outros
-            showResult(items[0].lat, items[0].lon, items[0].label);
-            if (items.length > 1) showSuggestions(items.slice(1), addr);
-          }
-        });
+      try {
+        var searchTerm = raw;
+        var cepDigits = raw.replace(/\D/g, "");
+
+        // Se o usuário digitou um CEP (8 dígitos)
+        if (cepDigits.length === 8) {
+          try {
+            var viaCepAddress = await searchViaCEP(cepDigits);
+            if (viaCepAddress) searchTerm = viaCepAddress;
+          } catch (_) {}
+        }
+
+        // Tenta busca com termo original / resolvido
+        var items = await searchPhoton(searchTerm);
+
+        // Se não achou e não citou Caxias, tenta adicionando Caxias do Sul
+        if ((!items || items.length === 0) && !/caxias/i.test(searchTerm)) {
+          items = await searchPhoton(searchTerm + ", Caxias do Sul, RS");
+        }
+
+        // Se ainda não achou e tem CEP, tenta buscar só os dígitos do CEP no Photon
+        if ((!items || items.length === 0) && cepDigits.length === 8) {
+          items = await searchPhoton(cepDigits);
+        }
+
+        if (!items || items.length === 0) {
+          rc.innerHTML =
+            '<div class="alert alert-warning" style="margin:0;">' +
+            '🔍 <strong>Nenhum resultado encontrado para "' + raw + '".</strong><br>' +
+            '<span style="font-size:0.86rem;">Dica: você pode digitar qualquer CEP (ex: 95010-001), bairro, rua ou cidade.</span></div>';
+          return;
+        }
+
+        // Exibe o melhor resultado
+        showResult(items[0].lat, items[0].lon, items[0].label);
+
+        // Se tiver mais de um resultado relevante, adiciona sugestões abaixo
+        if (items.length > 1) {
+          showSuggestions(items.slice(1), raw);
+        }
+
+      } catch (err) {
+        console.error("Erro na busca de endereço:", err);
+        rc.innerHTML =
+          '<div class="alert alert-warning" style="margin:0;">' +
+          '⚠️ <strong>Não foi possível consultar o serviço de mapas no momento.</strong><br>' +
+          '<span style="font-size:0.86rem;">Por favor, verifique sua conexão com a internet e tente novamente.</span></div>';
+      }
     }
 
     document.getElementById("addressInput").addEventListener("keydown", function(e) {
