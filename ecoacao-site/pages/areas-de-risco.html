@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
   <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <style>
     .risk-panel { background: var(--branco); border-radius: var(--radius); padding: 2rem; box-shadow: 0 2px 12px var(--sombra); margin-top: 2rem; }
     .risk-item { display: flex; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--bege-escuro); align-items: flex-start; }
@@ -220,8 +220,8 @@
     </div>
   </footer>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="../js/main.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=" crossorigin=""></script>
   <script>
     // ─── Inicializar Mapa ─────────────────────────────────────
     const map = L.map("map", { zoomControl: true }).setView([-29.1678, -51.1794], 13);
@@ -385,16 +385,16 @@
     // ─── Fetch com Timeout rígido (evita carregamento infinito) ───
     function fetchWithTimeout(url, ms) {
       var controller = new AbortController();
-      var timer = setTimeout(function() { controller.abort(); }, ms || 2500);
+      var timer = setTimeout(function() { controller.abort(); }, ms || 6000);
       return fetch(url, { signal: controller.signal })
         .finally(function() { clearTimeout(timer); });
     }
 
     // ─── Busca de CEP via BrasilAPI / ViaCEP ──────────────────
     async function resolveCEP(cepDigits) {
-      // 1. Tenta BrasilAPI com timeout de 2s
+      // 1. Tenta BrasilAPI
       try {
-        var r1 = await fetchWithTimeout("https://brasilapi.com.br/api/cep/v2/" + encodeURIComponent(cepDigits), 2000);
+        var r1 = await fetchWithTimeout("https://brasilapi.com.br/api/cep/v2/" + encodeURIComponent(cepDigits), 5000);
         if (r1.ok) {
           var d1 = await r1.json();
           if (d1.location && d1.location.coordinates && d1.location.coordinates.latitude) {
@@ -403,13 +403,15 @@
             var lbl = [d1.street, d1.neighborhood, d1.city, d1.state].filter(Boolean).join(", ");
             return [{ lat: lat, lon: lon, label: lbl + " (CEP " + cepDigits + ")" }];
           }
-          return [d1.street, d1.neighborhood, d1.city, d1.state, "Brasil"].filter(Boolean).join(", ");
+          // Tem dados de endereço mas sem coordenadas — retorna string para geocodificar depois
+          var addressStr = [d1.street, d1.neighborhood, d1.city, d1.state, "Brasil"].filter(Boolean).join(", ");
+          if (addressStr && addressStr.length > 5) return addressStr;
         }
       } catch (_) {}
 
-      // 2. Tenta ViaCEP com timeout de 2s
+      // 2. Tenta ViaCEP
       try {
-        var r2 = await fetchWithTimeout("https://viacep.com.br/ws/" + encodeURIComponent(cepDigits) + "/json/", 2000);
+        var r2 = await fetchWithTimeout("https://viacep.com.br/ws/" + encodeURIComponent(cepDigits) + "/json/", 5000);
         if (r2.ok) {
           var d2 = await r2.json();
           if (!d2.erro) {
@@ -422,63 +424,91 @@
     }
 
     // ─── Geocodificador Online com Timeout e Fallback ─────────
+    // Busca em PARALELO nos dois provedores e retorna o primeiro que responder com resultados
     async function geocodeQuery(query) {
-      var results = [];
-
-      // Provedor 1: Photon (Komoot) com timeout de 2.5s
-      try {
-        var url1 = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=6&lat=-29.1678&lon=-51.1794";
-        var r1 = await fetchWithTimeout(url1, 2500);
-        if (r1.ok) {
-          var g1 = await r1.json();
-          if (g1.features && g1.features.length > 0) {
-            results = g1.features.map(function(f) {
-              var p = f.properties || {};
-              var parts = [p.name, p.street ? (p.street + (p.housenumber ? ", " + p.housenumber : "")) : "", p.suburb, p.city || p.town, p.state, p.country].filter(Boolean);
-              var label = parts.filter(function(v, i, a) { return a.indexOf(v) === i; }).join(", ");
-              return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], label: label };
-            });
-            if (results.length > 0) return results;
+      // Provedor 1: Photon (Komoot)
+      var photonPromise = (async function() {
+        try {
+          var url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=6&lat=-29.1678&lon=-51.1794&lang=default";
+          var r = await fetchWithTimeout(url, 6000);
+          if (r.ok) {
+            var g = await r.json();
+            if (g.features && g.features.length > 0) {
+              return g.features.map(function(f) {
+                var p = f.properties || {};
+                var parts = [p.name, p.street ? (p.street + (p.housenumber ? ", " + p.housenumber : "")) : "", p.suburb, p.city || p.town, p.state, p.country].filter(Boolean);
+                var label = parts.filter(function(v, i, a) { return a.indexOf(v) === i; }).join(", ");
+                return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], label: label };
+              });
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+        return [];
+      })();
 
-      // Provedor 2: OpenStreetMap Nominatim com timeout de 2.5s
-      try {
-        var url2 = "https://nominatim.openstreetmap.org/search?format=json&limit=6&q=" + encodeURIComponent(query);
-        var r2 = await fetchWithTimeout(url2, 2500);
-        if (r2.ok) {
-          var g2 = await r2.json();
-          if (g2 && g2.length > 0) {
-            results = g2.map(function(d) {
-              return { lat: parseFloat(d.lat), lon: parseFloat(d.lon), label: d.display_name };
-            });
-            if (results.length > 0) return results;
+      // Provedor 2: OpenStreetMap Nominatim
+      var nominatimPromise = (async function() {
+        try {
+          var url = "https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=br&q=" + encodeURIComponent(query);
+          var r = await fetchWithTimeout(url, 8000);
+          if (r.ok) {
+            var g = await r.json();
+            if (g && g.length > 0) {
+              return g.map(function(d) {
+                return { lat: parseFloat(d.lat), lon: parseFloat(d.lon), label: d.display_name };
+              });
+            }
           }
+        } catch (_) {}
+        return [];
+      })();
+
+      // Espera ambos em paralelo — usa o primeiro que retornar resultados
+      var results = await Promise.allSettled([photonPromise, nominatimPromise]);
+
+      for (var i = 0; i < results.length; i++) {
+        if (results[i].status === "fulfilled" && results[i].value && results[i].value.length > 0) {
+          return results[i].value;
         }
-      } catch (_) {}
+      }
 
       return [];
     }
+
+    // ─── Controle de busca em andamento (evita duplicatas) ────
+    var searchInProgress = false;
 
     // ─── Busca principal: Instantânea para locais conhecidos ──
     async function searchAddress() {
       var raw = document.getElementById("addressInput").value.trim();
       if (!raw) { alert("Digite um endereço, rua, bairro, CEP ou cidade."); return; }
 
+      // Evita duplicar buscas se o usuário clicar várias vezes
+      if (searchInProgress) return;
+      searchInProgress = true;
+
+      var searchBtn = document.querySelector(".address-search .btn");
+      var originalBtnText = searchBtn ? searchBtn.textContent : "Verificar";
+      if (searchBtn) { searchBtn.textContent = "Buscando…"; searchBtn.disabled = true; }
+
       var resultBox = document.getElementById("resultBox");
       var rc        = document.getElementById("resultContent");
       resultBox.classList.add("show");
 
+      function finishSearch() {
+        searchInProgress = false;
+        if (searchBtn) { searchBtn.textContent = originalBtnText; searchBtn.disabled = false; }
+      }
+
       // ── PASSO 1: VERIFICAÇÃO LOCAL INSTANTÂNEA (0 milissegundos!) ──
-      // Se for um bairro, rua ou ponto conhecido de Caxias, exibe NA HORA sem esperar internet!
       var localFast = searchLocalDB(raw);
       if (localFast.length > 0) {
         showResult(localFast[0].lat, localFast[0].lon, localFast[0].label);
         if (localFast.length > 1) {
           showSuggestions(localFast.slice(1), raw);
         }
-        return; // Concluído instantaneamente!
+        finishSearch();
+        return;
       }
 
       // Se for busca externa ou CEP, mostra o indicador
@@ -487,74 +517,94 @@
         '<div class="spinner" style="margin:0 auto 0.9rem;width:28px;height:28px;border-width:4px;"></div>' +
         '<span style="color:#6b6b6b;font-size:0.9rem;">Buscando <em>"' + raw + '"</em>…</span></div>';
 
+      // Timeout global: máximo de 12 segundos para a busca inteira
+      var globalTimeout = new Promise(function(_, reject) {
+        setTimeout(function() { reject(new Error("TIMEOUT_GLOBAL")); }, 12000);
+      });
+
       try {
-        var searchTerm = raw;
-        var cepDigits = raw.replace(/\D/g, "");
-        var items = [];
+        await Promise.race([globalTimeout, (async function() {
+          var searchTerm = raw;
+          var cepDigits = raw.replace(/\D/g, "");
+          var items = [];
 
-        // ── PASSO 2: SE FOR CEP (8 DÍGITOS) ──
-        if (cepDigits.length === 8) {
-          var cepRes = await resolveCEP(cepDigits);
-          if (Array.isArray(cepRes)) {
-            items = cepRes; // Latitude e longitude diretas!
-          } else if (typeof cepRes === "string") {
-            // Verifica se o endereço retornado pelo CEP casa com algum bairro local
-            var fromCep = searchLocalDB(cepRes);
-            if (fromCep.length > 0) {
-              showResult(fromCep[0].lat, fromCep[0].lon, cepRes);
-              return;
+          // ── PASSO 2: SE FOR CEP (8 DÍGITOS) ──
+          if (cepDigits.length === 8) {
+            var cepRes = await resolveCEP(cepDigits);
+            if (Array.isArray(cepRes)) {
+              items = cepRes;
+            } else if (typeof cepRes === "string") {
+              var fromCep = searchLocalDB(cepRes);
+              if (fromCep.length > 0) {
+                showResult(fromCep[0].lat, fromCep[0].lon, cepRes);
+                finishSearch();
+                return;
+              }
+              searchTerm = cepRes;
             }
-            searchTerm = cepRes;
           }
-        }
 
-        // ── PASSO 3: BUSCA ONLINE (PHOTON / NOMINATIM COM TIMEOUT) ──
-        if (items.length === 0) {
-          items = await geocodeQuery(searchTerm);
+          // ── PASSO 3: BUSCA ONLINE (PHOTON + NOMINATIM EM PARALELO) ──
+          if (items.length === 0) {
+            items = await geocodeQuery(searchTerm);
 
-          if (items.length === 0 && !/caxias/i.test(searchTerm)) {
-            items = await geocodeQuery(searchTerm + ", Caxias do Sul");
+            // Se não encontrou nada, tenta adicionar "Caxias do Sul" ao termo
+            if (items.length === 0 && !/caxias/i.test(searchTerm)) {
+              items = await geocodeQuery(searchTerm + ", Caxias do Sul, RS, Brasil");
+            }
           }
-        }
 
-        // ── PASSO 4: FALLBACK LOCAL INTELIGENTE ──
-        if (items.length === 0) {
-          var words = searchTerm.split(/[\s,]+/);
-          for (var w of words) {
-            if (w.length > 3) {
-              var m = searchLocalDB(w);
-              if (m.length > 0) {
-                items = m;
-                break;
+          // ── PASSO 4: FALLBACK LOCAL INTELIGENTE ──
+          if (items.length === 0) {
+            var words = searchTerm.split(/[\s,]+/);
+            for (var w of words) {
+              if (w.length > 3) {
+                var m = searchLocalDB(w);
+                if (m.length > 0) {
+                  items = m;
+                  break;
+                }
               }
             }
           }
-        }
 
-        if (!items || items.length === 0) {
-          rc.innerHTML =
-            '<div class="alert alert-warning" style="margin:0;">' +
-            '🔍 <strong>Nenhum resultado encontrado para "' + raw + '".</strong><br>' +
-            '<span style="font-size:0.86rem;">Experimente clicar nos exemplos rápidos (São Caetano, Forqueta, Centro) ou digite um bairro de Caxias do Sul.</span></div>';
-          return;
-        }
+          if (!items || items.length === 0) {
+            rc.innerHTML =
+              '<div class="alert alert-warning" style="margin:0;">' +
+              '🔍 <strong>Nenhum resultado encontrado para "' + raw + '".</strong><br>' +
+              '<span style="font-size:0.86rem;">Experimente digitar o nome completo do bairro, rua ou cidade. Exemplos: "São Caetano", "Forqueta", "Centro, Caxias do Sul".</span></div>';
+            finishSearch();
+            return;
+          }
 
-        showResult(items[0].lat, items[0].lon, items[0].label);
+          showResult(items[0].lat, items[0].lon, items[0].label);
 
-        if (items.length > 1) {
-          showSuggestions(items.slice(1), raw);
-        }
+          if (items.length > 1) {
+            showSuggestions(items.slice(1), raw);
+          }
+
+          finishSearch();
+        })()]);
 
       } catch (err) {
         console.error("Erro na busca:", err);
+
+        // Se foi timeout global, mostra mensagem amigável
         var fallback = searchLocalDB(raw);
         if (fallback.length > 0) {
           showResult(fallback[0].lat, fallback[0].lon, fallback[0].label);
+        } else if (err && err.message === "TIMEOUT_GLOBAL") {
+          rc.innerHTML =
+            '<div class="alert alert-warning" style="margin:0;">' +
+            '⏱️ <strong>A busca demorou demais.</strong> Isso pode acontecer com conexões lentas.<br>' +
+            '<span style="font-size:0.86rem;">Tente novamente ou clique em um dos exemplos rápidos acima.</span></div>';
         } else {
           rc.innerHTML =
             '<div class="alert alert-warning" style="margin:0;">' +
-            '⚠️ <strong>Não foi possível obter dados online no momento.</strong> Clique em um dos exemplos rápidos acima para testar.</div>';
+            '⚠️ <strong>Não foi possível obter dados online no momento.</strong><br>' +
+            '<span style="font-size:0.86rem;">Verifique sua conexão e tente novamente, ou clique em um dos exemplos rápidos acima.</span></div>';
         }
+        finishSearch();
       }
     }
 
@@ -564,7 +614,7 @@
     }
 
     document.getElementById("addressInput").addEventListener("keydown", function(e) {
-      if (e.key === "Enter") searchAddress();
+      if (e.key === "Enter") { e.preventDefault(); searchAddress(); }
     });
   </script>
 </body>
