@@ -382,11 +382,19 @@
       rc.appendChild(container);
     }
 
+    // ─── Fetch com Timeout rígido (evita carregamento infinito) ───
+    function fetchWithTimeout(url, ms) {
+      var controller = new AbortController();
+      var timer = setTimeout(function() { controller.abort(); }, ms || 2500);
+      return fetch(url, { signal: controller.signal })
+        .finally(function() { clearTimeout(timer); });
+    }
+
     // ─── Busca de CEP via BrasilAPI / ViaCEP ──────────────────
     async function resolveCEP(cepDigits) {
-      // 1. Tenta BrasilAPI (muitas vezes já inclui latitude/longitude)
+      // 1. Tenta BrasilAPI com timeout de 2s
       try {
-        var r1 = await fetch("https://brasilapi.com.br/api/cep/v2/" + encodeURIComponent(cepDigits));
+        var r1 = await fetchWithTimeout("https://brasilapi.com.br/api/cep/v2/" + encodeURIComponent(cepDigits), 2000);
         if (r1.ok) {
           var d1 = await r1.json();
           if (d1.location && d1.location.coordinates && d1.location.coordinates.latitude) {
@@ -395,14 +403,13 @@
             var lbl = [d1.street, d1.neighborhood, d1.city, d1.state].filter(Boolean).join(", ");
             return [{ lat: lat, lon: lon, label: lbl + " (CEP " + cepDigits + ")" }];
           }
-          var text1 = [d1.street, d1.neighborhood, d1.city, d1.state, "Brasil"].filter(Boolean).join(", ");
-          return text1;
+          return [d1.street, d1.neighborhood, d1.city, d1.state, "Brasil"].filter(Boolean).join(", ");
         }
       } catch (_) {}
 
-      // 2. Tenta ViaCEP
+      // 2. Tenta ViaCEP com timeout de 2s
       try {
-        var r2 = await fetch("https://viacep.com.br/ws/" + encodeURIComponent(cepDigits) + "/json/");
+        var r2 = await fetchWithTimeout("https://viacep.com.br/ws/" + encodeURIComponent(cepDigits) + "/json/", 2000);
         if (r2.ok) {
           var d2 = await r2.json();
           if (!d2.erro) {
@@ -414,14 +421,14 @@
       return null;
     }
 
-    // ─── Geocodificador Multi-Serviço com Fallback ────────────
+    // ─── Geocodificador Online com Timeout e Fallback ─────────
     async function geocodeQuery(query) {
       var results = [];
 
-      // Provedor 1: Photon (Komoot)
+      // Provedor 1: Photon (Komoot) com timeout de 2.5s
       try {
         var url1 = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=6&lat=-29.1678&lon=-51.1794";
-        var r1 = await fetch(url1);
+        var r1 = await fetchWithTimeout(url1, 2500);
         if (r1.ok) {
           var g1 = await r1.json();
           if (g1.features && g1.features.length > 0) {
@@ -434,14 +441,12 @@
             if (results.length > 0) return results;
           }
         }
-      } catch (e1) {
-        console.warn("Photon indisponível, tentando Nominatim...", e1);
-      }
+      } catch (_) {}
 
-      // Provedor 2: OpenStreetMap Nominatim
+      // Provedor 2: OpenStreetMap Nominatim com timeout de 2.5s
       try {
         var url2 = "https://nominatim.openstreetmap.org/search?format=json&limit=6&q=" + encodeURIComponent(query);
-        var r2 = await fetch(url2);
+        var r2 = await fetchWithTimeout(url2, 2500);
         if (r2.ok) {
           var g2 = await r2.json();
           if (g2 && g2.length > 0) {
@@ -451,20 +456,12 @@
             if (results.length > 0) return results;
           }
         }
-      } catch (e2) {
-        console.warn("Nominatim indisponível...", e2);
-      }
-
-      // Provedor 3: Base Local Caxias do Sul (Fallback Instantâneo Offline)
-      var local = searchLocalDB(query);
-      if (local && local.length > 0) {
-        return local;
-      }
+      } catch (_) {}
 
       return [];
     }
 
-    // ─── Busca principal ──────────────────────────────────────
+    // ─── Busca principal: Instantânea para locais conhecidos ──
     async function searchAddress() {
       var raw = document.getElementById("addressInput").value.trim();
       if (!raw) { alert("Digite um endereço, rua, bairro, CEP ou cidade."); return; }
@@ -472,6 +469,19 @@
       var resultBox = document.getElementById("resultBox");
       var rc        = document.getElementById("resultContent");
       resultBox.classList.add("show");
+
+      // ── PASSO 1: VERIFICAÇÃO LOCAL INSTANTÂNEA (0 milissegundos!) ──
+      // Se for um bairro, rua ou ponto conhecido de Caxias, exibe NA HORA sem esperar internet!
+      var localFast = searchLocalDB(raw);
+      if (localFast.length > 0) {
+        showResult(localFast[0].lat, localFast[0].lon, localFast[0].label);
+        if (localFast.length > 1) {
+          showSuggestions(localFast.slice(1), raw);
+        }
+        return; // Concluído instantaneamente!
+      }
+
+      // Se for busca externa ou CEP, mostra o indicador
       rc.innerHTML =
         '<div style="text-align:center;padding:1.5rem;">' +
         '<div class="spinner" style="margin:0 auto 0.9rem;width:28px;height:28px;border-width:4px;"></div>' +
@@ -482,54 +492,68 @@
         var cepDigits = raw.replace(/\D/g, "");
         var items = [];
 
-        // Se for CEP de 8 dígitos
+        // ── PASSO 2: SE FOR CEP (8 DÍGITOS) ──
         if (cepDigits.length === 8) {
           var cepRes = await resolveCEP(cepDigits);
           if (Array.isArray(cepRes)) {
-            items = cepRes; // Já retornou com lat/lon direto da BrasilAPI!
+            items = cepRes; // Latitude e longitude diretas!
           } else if (typeof cepRes === "string") {
+            // Verifica se o endereço retornado pelo CEP casa com algum bairro local
+            var fromCep = searchLocalDB(cepRes);
+            if (fromCep.length > 0) {
+              showResult(fromCep[0].lat, fromCep[0].lon, cepRes);
+              return;
+            }
             searchTerm = cepRes;
           }
         }
 
-        // Se ainda não tem items (não foi resolvido direto por CEP)
+        // ── PASSO 3: BUSCA ONLINE (PHOTON / NOMINATIM COM TIMEOUT) ──
         if (items.length === 0) {
-          // Busca geocodificada
           items = await geocodeQuery(searchTerm);
 
-          // Se não encontrou e o termo não cita Caxias, tenta com ", Caxias do Sul"
           if (items.length === 0 && !/caxias/i.test(searchTerm)) {
             items = await geocodeQuery(searchTerm + ", Caxias do Sul");
           }
         }
 
-        // Se após tudo ainda não encontrou
+        // ── PASSO 4: FALLBACK LOCAL INTELIGENTE ──
+        if (items.length === 0) {
+          var words = searchTerm.split(/[\s,]+/);
+          for (var w of words) {
+            if (w.length > 3) {
+              var m = searchLocalDB(w);
+              if (m.length > 0) {
+                items = m;
+                break;
+              }
+            }
+          }
+        }
+
         if (!items || items.length === 0) {
           rc.innerHTML =
             '<div class="alert alert-warning" style="margin:0;">' +
             '🔍 <strong>Nenhum resultado encontrado para "' + raw + '".</strong><br>' +
-            '<span style="font-size:0.86rem;">Experimente clicar em um dos exemplos rápidos acima ou digite um bairro como <em>São Caetano</em> ou <em>Forqueta</em>.</span></div>';
+            '<span style="font-size:0.86rem;">Experimente clicar nos exemplos rápidos (São Caetano, Forqueta, Centro) ou digite um bairro de Caxias do Sul.</span></div>';
           return;
         }
 
-        // Exibe o melhor resultado
         showResult(items[0].lat, items[0].lon, items[0].label);
 
-        // Se tiver mais resultados, exibe sugestões
         if (items.length > 1) {
           showSuggestions(items.slice(1), raw);
         }
 
       } catch (err) {
-        console.error("Erro inesperado:", err);
-        // Fallback garantido usando a base local para nunca deixar o usuário na mão
+        console.error("Erro na busca:", err);
         var fallback = searchLocalDB(raw);
         if (fallback.length > 0) {
           showResult(fallback[0].lat, fallback[0].lon, fallback[0].label);
         } else {
           rc.innerHTML =
             '<div class="alert alert-warning" style="margin:0;">' +
-            '⚠️ <strong>Não foi possível obter dados online.</strong> Experimente clicar em um dos exemplos rápidos acima: São Caetano, Forqueta ou Centro.</div>';
+            '⚠️ <strong>Não foi possível obter dados online no momento.</strong> Clique em um dos exemplos rápidos acima para testar.</div>';
         }
       }
     }
