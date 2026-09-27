@@ -68,9 +68,36 @@
       <div style="max-width: 860px; margin: 0 auto;">
         <h3 style="margin-bottom: 1rem;">🔍 Verificar meu endereço</h3>
         <div class="address-search">
-          <input type="text" id="addressInput" placeholder="Ex.: Rua Flores da Cunha, 1200 — Caxias do Sul, RS" />
+          <input type="text" id="addressInput" placeholder="Digite CEP (ex: 95010-001), rua, bairro ou cidade..." />
           <button class="btn btn-verde" onclick="searchAddress()">Verificar</button>
         </div>
+
+        <!-- Sugestões de clique rápido -->
+        <div style="margin: -0.5rem 0 1.2rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+          <span style="font-size: 0.78rem; color: var(--texto-claro); font-weight: 600;">Exemplos rápidos:</span>
+          <button type="button" class="btn-chip" onclick="quickSearch('São Caetano')">📍 São Caetano</button>
+          <button type="button" class="btn-chip" onclick="quickSearch('Forqueta')">📍 Forqueta</button>
+          <button type="button" class="btn-chip" onclick="quickSearch('95010-001')">📮 CEP 95010-001</button>
+          <button type="button" class="btn-chip" onclick="quickSearch('Av. Ernesto Alves')">📍 Av. Ernesto Alves</button>
+          <button type="button" class="btn-chip" onclick="quickSearch('Centro, Caxias do Sul')">📍 Centro</button>
+        </div>
+
+        <style>
+          .btn-chip {
+            background: var(--branco);
+            border: 1px solid var(--bege-escuro);
+            border-radius: 50px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.78rem;
+            color: var(--verde-escuro);
+            cursor: pointer;
+            transition: all var(--trans);
+          }
+          .btn-chip:hover {
+            background: var(--verde-suave);
+            border-color: var(--verde-medio);
+          }
+        </style>
 
         <!-- Resultado -->
         <div id="resultBox" class="result-box">
@@ -196,12 +223,6 @@
   <script src="../js/main.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=" crossorigin=""></script>
   <script>
-    /* ==============================================================
-       GEOCODIFICAÇÃO — usa Photon (Komoot) como primário
-       e Nominatim como fallback. Ambos são gratuitos, sem API key.
-       Photon tem CORS totalmente liberado para browsers locais (file://).
-       Funciona com qualquer CEP, rua, bairro, cidade, ponto de interesse.
-       ============================================================== */
     // ─── Inicializar Mapa ─────────────────────────────────────
     const map = L.map("map", { zoomControl: true }).setView([-29.1678, -51.1794], 13);
 
@@ -240,10 +261,50 @@
         .bindPopup(`<strong>${z.name}</strong><br/>Risco: ${z.risk.toUpperCase()}`);
     });
 
+    // ─── Base Local de Segurança para Caxias do Sul (Fallback Instantâneo) ───
+    const LOCAL_DB = [
+      { name: "São Caetano", lat: -29.2003, lon: -51.2076, label: "Bairro São Caetano, Caxias do Sul - RS" },
+      { name: "Forqueta", lat: -29.2150, lon: -51.2400, label: "Bairro Forqueta, Caxias do Sul - RS" },
+      { name: "Centro", lat: -29.1681, lon: -51.1794, label: "Centro, Caxias do Sul - RS" },
+      { name: "Ernesto Alves", lat: -29.1750, lon: -51.1750, label: "Av. Ernesto Alves, Caxias do Sul - RS" },
+      { name: "Flores da Cunha", lat: -29.1650, lon: -51.1820, label: "Rua Flores da Cunha, Caxias do Sul - RS" },
+      { name: "Sinimbu", lat: -29.1680, lon: -51.1780, label: "Rua Sinimbu, Caxias do Sul - RS" },
+      { name: "Ana Rech", lat: -29.1300, lon: -51.0800, label: "Bairro Ana Rech, Caxias do Sul - RS" },
+      { name: "Cruzeiro", lat: -29.1750, lon: -51.1550, label: "Bairro Cruzeiro, Caxias do Sul - RS" },
+      { name: "Lourdes", lat: -29.1720, lon: -51.1700, label: "Bairro Lourdes, Caxias do Sul - RS" },
+      { name: "Pio X", lat: -29.1620, lon: -51.1850, label: "Bairro Pio X, Caxias do Sul - RS" },
+      { name: "Santa Catarina", lat: -29.1550, lon: -51.1920, label: "Bairro Santa Catarina, Caxias do Sul - RS" },
+      { name: "Panazzolo", lat: -29.1800, lon: -51.1680, label: "Bairro Panazzolo, Caxias do Sul - RS" },
+      { name: "Charqueadas", lat: -29.2000, lon: -51.1950, label: "Bairro Charqueadas, Caxias do Sul - RS" },
+      { name: "Desvio Rizzo", lat: -29.1950, lon: -51.2250, label: "Bairro Desvio Rizzo, Caxias do Sul - RS" },
+      { name: "Esplanada", lat: -29.1950, lon: -51.1980, label: "Bairro Esplanada, Caxias do Sul - RS" },
+      { name: "Sagrada Família", lat: -29.1850, lon: -51.1500, label: "Bairro Sagrada Família, Caxias do Sul - RS" },
+      { name: "Bela Vista", lat: -29.1700, lon: -51.1500, label: "Bairro Bela Vista, Caxias do Sul - RS" },
+      { name: "Jardim América", lat: -29.1580, lon: -51.1700, label: "Bairro Jardim América, Caxias do Sul - RS" },
+      { name: "Kayser", lat: -29.1900, lon: -51.1900, label: "Bairro Kayser, Caxias do Sul - RS" },
+      { name: "Madureira", lat: -29.1520, lon: -51.1800, label: "Bairro Madureira, Caxias do Sul - RS" },
+      { name: "São José", lat: -29.1500, lon: -51.1650, label: "Bairro São José, Caxias do Sul - RS" },
+      { name: "São Pelegrino", lat: -29.1670, lon: -51.1880, label: "Bairro São Pelegrino, Caxias do Sul - RS" },
+      { name: "Villagio Iguatemi", lat: -29.1780, lon: -51.2180, label: "Villagio Iguatemi, Caxias do Sul - RS" },
+      { name: "Caxias do Sul", lat: -29.1678, lon: -51.1794, label: "Caxias do Sul - RS, Brasil" }
+    ];
+
+    function searchLocalDB(term) {
+      function norm(s) {
+        return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      }
+      var clean = norm(term);
+      if (!clean) return [];
+      return LOCAL_DB.filter(function(item) {
+        var n = norm(item.name);
+        return n.includes(clean) || clean.includes(n);
+      });
+    }
+
     // ─── Marcador do usuário ──────────────────────────────────
     var userMarker = null;
 
-    // ─── Calcula risco por distância pura (sem banco de endereços) ──
+    // ─── Calcula risco por distância pura (sem banco fixo) ────
     function calcRisk(lat, lon) {
       var best = null, minDist = Infinity;
       riskZones.forEach(function(z) {
@@ -263,7 +324,6 @@
         })
       }).addTo(map).bindPopup("<strong>📍 " + displayName + "</strong>").openPopup();
 
-      // Zoom adaptativo
       var hasDigit = /\d/.test(displayName);
       map.setView([lat, lon], hasDigit ? 16 : 14);
 
@@ -280,20 +340,19 @@
           '<h4 style="color:' + cor + ';margin-bottom:0.6rem;">⚠️ ' + (alto ? "Atenção: Área de Alto Risco!" : "Área de Risco Moderado") + '</h4>' +
           '<p style="margin:0 0 0.5rem;"><strong>Local:</strong> ' + displayName + '</p>' +
           '<p style="margin:0 0 0.5rem;">Dentro do raio de risco de <strong>' + zone.name + '</strong> — nível <strong>' + zone.risk.toUpperCase() + '</strong>.</p>' +
-          '<p style="margin:0;">Confira as <a href="#recomendacoes" style="color:' + cor + ';">recomendações de saúde</a> abaixo e <a href="login.html" style="color:' + cor + ';">assine a petição</a>.</p>' +
+          '<p style="margin:0;">Confira as recomendações de saúde abaixo e considere <a href="login.html" style="color:' + cor + ';font-weight:600;">assinar a petição</a>.</p>' +
           '</div>';
       } else {
         rc.innerHTML =
           '<div style="background:#f0fff4;border:2px solid #2e7d45;border-radius:12px;padding:1.2rem;">' +
           '<h4 style="color:#1e4d2b;margin-bottom:0.6rem;">✅ Sem risco imediato identificado</h4>' +
           '<p style="margin:0 0 0.5rem;"><strong>Local:</strong> ' + displayName + '</p>' +
-          '<p style="margin:0;">Este ponto não está dentro das zonas de risco mapeadas. Continue se informando e <a href="login.html" style="color:#2e7d45;">assine a petição</a>.</p>' +
+          '<p style="margin:0;">Este ponto não está dentro das zonas de risco mapeadas. Continue se informando e considere <a href="login.html" style="color:#2e7d45;font-weight:600;">assinar a petição</a>.</p>' +
           '</div>';
       }
     }
 
-    // ─── Exibe lista de sugestões clicáveis ──────────────────
-    // ─── Exibe lista de sugestões clicáveis abaixo do resultado ──
+    // ─── Exibe sugestões adicionais ───────────────────────────
     function showSuggestions(items, originalInput) {
       var rc = document.getElementById("resultContent");
       var container = document.createElement("div");
@@ -323,49 +382,89 @@
       rc.appendChild(container);
     }
 
-    // ─── Formata objeto do Photon em label legível ───────────
-    function formatPhotonItem(f) {
-      var p   = f.properties || {};
-      var lon = f.geometry.coordinates[0];
-      var lat = f.geometry.coordinates[1];
-      var parts = [];
-      if (p.name)        parts.push(p.name);
-      if (p.street)      parts.push(p.street + (p.housenumber ? ", " + p.housenumber : ""));
-      if (p.district)    parts.push(p.district);
-      if (p.suburb)      parts.push(p.suburb);
-      if (p.city)        parts.push(p.city);
-      else if (p.town)   parts.push(p.town);
-      else if (p.village) parts.push(p.village);
-      if (p.state)       parts.push(p.state);
-      if (p.country)     parts.push(p.country);
+    // ─── Busca de CEP via BrasilAPI / ViaCEP ──────────────────
+    async function resolveCEP(cepDigits) {
+      // 1. Tenta BrasilAPI (muitas vezes já inclui latitude/longitude)
+      try {
+        var r1 = await fetch("https://brasilapi.com.br/api/cep/v2/" + encodeURIComponent(cepDigits));
+        if (r1.ok) {
+          var d1 = await r1.json();
+          if (d1.location && d1.location.coordinates && d1.location.coordinates.latitude) {
+            var lat = parseFloat(d1.location.coordinates.latitude);
+            var lon = parseFloat(d1.location.coordinates.longitude);
+            var lbl = [d1.street, d1.neighborhood, d1.city, d1.state].filter(Boolean).join(", ");
+            return [{ lat: lat, lon: lon, label: lbl + " (CEP " + cepDigits + ")" }];
+          }
+          var text1 = [d1.street, d1.neighborhood, d1.city, d1.state, "Brasil"].filter(Boolean).join(", ");
+          return text1;
+        }
+      } catch (_) {}
 
-      var label = parts.filter(function(v, i, a) { return Boolean(v) && a.indexOf(v) === i; }).join(", ");
-      return { lat: lat, lon: lon, label: label || (lat + ", " + lon) };
+      // 2. Tenta ViaCEP
+      try {
+        var r2 = await fetch("https://viacep.com.br/ws/" + encodeURIComponent(cepDigits) + "/json/");
+        if (r2.ok) {
+          var d2 = await r2.json();
+          if (!d2.erro) {
+            return [d2.logradouro, d2.bairro, d2.localidade, d2.uf, "Brasil"].filter(Boolean).join(", ");
+          }
+        }
+      } catch (_) {}
+
+      return null;
     }
 
-    // ─── Busca Photon (Komoot) com viés de localização local ──
-    async function searchPhoton(query) {
-      // Prioriza a região de Caxias do Sul/RS, mas funciona com qualquer lugar
-      var url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=6&lat=-29.1678&lon=-51.1794";
-      var res = await fetch(url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      var geo = await res.json();
-      if (!geo.features || geo.features.length === 0) return [];
-      return geo.features.map(formatPhotonItem);
+    // ─── Geocodificador Multi-Serviço com Fallback ────────────
+    async function geocodeQuery(query) {
+      var results = [];
+
+      // Provedor 1: Photon (Komoot)
+      try {
+        var url1 = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=6&lat=-29.1678&lon=-51.1794";
+        var r1 = await fetch(url1);
+        if (r1.ok) {
+          var g1 = await r1.json();
+          if (g1.features && g1.features.length > 0) {
+            results = g1.features.map(function(f) {
+              var p = f.properties || {};
+              var parts = [p.name, p.street ? (p.street + (p.housenumber ? ", " + p.housenumber : "")) : "", p.suburb, p.city || p.town, p.state, p.country].filter(Boolean);
+              var label = parts.filter(function(v, i, a) { return a.indexOf(v) === i; }).join(", ");
+              return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], label: label };
+            });
+            if (results.length > 0) return results;
+          }
+        }
+      } catch (e1) {
+        console.warn("Photon indisponível, tentando Nominatim...", e1);
+      }
+
+      // Provedor 2: OpenStreetMap Nominatim
+      try {
+        var url2 = "https://nominatim.openstreetmap.org/search?format=json&limit=6&q=" + encodeURIComponent(query);
+        var r2 = await fetch(url2);
+        if (r2.ok) {
+          var g2 = await r2.json();
+          if (g2 && g2.length > 0) {
+            results = g2.map(function(d) {
+              return { lat: parseFloat(d.lat), lon: parseFloat(d.lon), label: d.display_name };
+            });
+            if (results.length > 0) return results;
+          }
+        }
+      } catch (e2) {
+        console.warn("Nominatim indisponível...", e2);
+      }
+
+      // Provedor 3: Base Local Caxias do Sul (Fallback Instantâneo Offline)
+      var local = searchLocalDB(query);
+      if (local && local.length > 0) {
+        return local;
+      }
+
+      return [];
     }
 
-    // ─── Suporte a CEP brasileiro via ViaCEP ──────────────────
-    async function searchViaCEP(cepClean) {
-      var url = "https://viacep.com.br/ws/" + encodeURIComponent(cepClean) + "/json/";
-      var res = await fetch(url);
-      if (!res.ok) return null;
-      var data = await res.json();
-      if (data.erro) return null;
-      var query = [data.logradouro, data.bairro, data.localidade, data.uf, "Brasil"].filter(Boolean).join(", ");
-      return query;
-    }
-
-    // ─── Busca principal com fallback e timeout seguro ─────────
+    // ─── Busca principal ──────────────────────────────────────
     async function searchAddress() {
       var raw = document.getElementById("addressInput").value.trim();
       if (!raw) { alert("Digite um endereço, rua, bairro, CEP ou cidade."); return; }
@@ -381,51 +480,63 @@
       try {
         var searchTerm = raw;
         var cepDigits = raw.replace(/\D/g, "");
+        var items = [];
 
-        // Se o usuário digitou um CEP (8 dígitos)
+        // Se for CEP de 8 dígitos
         if (cepDigits.length === 8) {
-          try {
-            var viaCepAddress = await searchViaCEP(cepDigits);
-            if (viaCepAddress) searchTerm = viaCepAddress;
-          } catch (_) {}
+          var cepRes = await resolveCEP(cepDigits);
+          if (Array.isArray(cepRes)) {
+            items = cepRes; // Já retornou com lat/lon direto da BrasilAPI!
+          } else if (typeof cepRes === "string") {
+            searchTerm = cepRes;
+          }
         }
 
-        // Tenta busca com termo original / resolvido
-        var items = await searchPhoton(searchTerm);
+        // Se ainda não tem items (não foi resolvido direto por CEP)
+        if (items.length === 0) {
+          // Busca geocodificada
+          items = await geocodeQuery(searchTerm);
 
-        // Se não achou e não citou Caxias, tenta adicionando Caxias do Sul
-        if ((!items || items.length === 0) && !/caxias/i.test(searchTerm)) {
-          items = await searchPhoton(searchTerm + ", Caxias do Sul, RS");
+          // Se não encontrou e o termo não cita Caxias, tenta com ", Caxias do Sul"
+          if (items.length === 0 && !/caxias/i.test(searchTerm)) {
+            items = await geocodeQuery(searchTerm + ", Caxias do Sul");
+          }
         }
 
-        // Se ainda não achou e tem CEP, tenta buscar só os dígitos do CEP no Photon
-        if ((!items || items.length === 0) && cepDigits.length === 8) {
-          items = await searchPhoton(cepDigits);
-        }
-
+        // Se após tudo ainda não encontrou
         if (!items || items.length === 0) {
           rc.innerHTML =
             '<div class="alert alert-warning" style="margin:0;">' +
             '🔍 <strong>Nenhum resultado encontrado para "' + raw + '".</strong><br>' +
-            '<span style="font-size:0.86rem;">Dica: você pode digitar qualquer CEP (ex: 95010-001), bairro, rua ou cidade.</span></div>';
+            '<span style="font-size:0.86rem;">Experimente clicar em um dos exemplos rápidos acima ou digite um bairro como <em>São Caetano</em> ou <em>Forqueta</em>.</span></div>';
           return;
         }
 
         // Exibe o melhor resultado
         showResult(items[0].lat, items[0].lon, items[0].label);
 
-        // Se tiver mais de um resultado relevante, adiciona sugestões abaixo
+        // Se tiver mais resultados, exibe sugestões
         if (items.length > 1) {
           showSuggestions(items.slice(1), raw);
         }
 
       } catch (err) {
-        console.error("Erro na busca de endereço:", err);
-        rc.innerHTML =
-          '<div class="alert alert-warning" style="margin:0;">' +
-          '⚠️ <strong>Não foi possível consultar o serviço de mapas no momento.</strong><br>' +
-          '<span style="font-size:0.86rem;">Por favor, verifique sua conexão com a internet e tente novamente.</span></div>';
+        console.error("Erro inesperado:", err);
+        // Fallback garantido usando a base local para nunca deixar o usuário na mão
+        var fallback = searchLocalDB(raw);
+        if (fallback.length > 0) {
+          showResult(fallback[0].lat, fallback[0].lon, fallback[0].label);
+        } else {
+          rc.innerHTML =
+            '<div class="alert alert-warning" style="margin:0;">' +
+            '⚠️ <strong>Não foi possível obter dados online.</strong> Experimente clicar em um dos exemplos rápidos acima: São Caetano, Forqueta ou Centro.</div>';
+        }
       }
+    }
+
+    function quickSearch(val) {
+      document.getElementById("addressInput").value = val;
+      searchAddress();
     }
 
     document.getElementById("addressInput").addEventListener("keydown", function(e) {
